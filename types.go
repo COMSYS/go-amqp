@@ -146,7 +146,7 @@ const (
 	frameHeaderSize = 8
 )
 
-type protoHeader struct {
+type ProtoHeader struct {
 	ProtoID  protoID
 	Major    uint8
 	Minor    uint8
@@ -184,7 +184,7 @@ type frameBody interface {
 </type>
 */
 
-type performOpen struct {
+type PerformOpen struct {
 	ContainerID         string // required
 	Hostname            string
 	MaxFrameSize        uint32        // default: 4294967295
@@ -197,9 +197,9 @@ type performOpen struct {
 	Properties          map[symbol]interface{}
 }
 
-func (o *performOpen) frameBody() {}
+func (o *PerformOpen) frameBody() {}
 
-func (o *performOpen) marshal(wr *buffer) error {
+func (o *PerformOpen) marshal(wr *buffer) error {
 	return marshalComposite(wr, typeCodeOpen, []marshalField{
 		{value: &o.ContainerID, omit: false},
 		{value: &o.Hostname, omit: o.Hostname == ""},
@@ -214,7 +214,7 @@ func (o *performOpen) marshal(wr *buffer) error {
 	})
 }
 
-func (o *performOpen) unmarshal(r *buffer) error {
+func (o *PerformOpen) unmarshal(r *buffer) error {
 	return unmarshalComposite(r, typeCodeOpen, []unmarshalField{
 		{field: &o.ContainerID, handleNull: func() error { return errorNew("Open.ContainerID is required") }},
 		{field: &o.Hostname},
@@ -229,7 +229,7 @@ func (o *performOpen) unmarshal(r *buffer) error {
 	}...)
 }
 
-func (o *performOpen) String() string {
+func (o *PerformOpen) String() string {
 	return fmt.Sprintf("Open{ContainerID : %s, Hostname: %s, MaxFrameSize: %d, "+
 		"ChannelMax: %d, IdleTimeout: %v, "+
 		"OutgoingLocales: %v, IncomingLocales: %v, "+

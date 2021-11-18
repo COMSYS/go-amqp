@@ -91,7 +91,7 @@ func TestConnSASLXOAUTH2AuthSuccess(t *testing.T) {
 		frame{
 			type_:   frameTypeAMQP,
 			channel: 0,
-			body:    &performOpen{},
+			body:    &PerformOpen{},
 		},
 	)
 

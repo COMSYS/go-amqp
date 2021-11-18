@@ -35,19 +35,19 @@ func parseFrameHeader(r *buffer) (frameHeader, error) {
 // parseProtoHeader reads the proto header from r and returns the results
 //
 // An error is returned if the protocol is not "AMQP" or if the version is not 1.0.0.
-func parseProtoHeader(r *buffer) (protoHeader, error) {
+func parseProtoHeader(r *buffer) (ProtoHeader, error) {
 	const protoHeaderSize = 8
 	buf, ok := r.next(protoHeaderSize)
 	if !ok {
-		return protoHeader{}, errorNew("invalid protoHeader")
+		return ProtoHeader{}, errorNew("invalid protoHeader")
 	}
 	_ = buf[7]
 
 	if !bytes.Equal(buf[:4], []byte{'A', 'M', 'Q', 'P'}) {
-		return protoHeader{}, errorErrorf("unexpected protocol %q", buf[:4])
+		return ProtoHeader{}, errorErrorf("unexpected protocol %q", buf[:4])
 	}
 
-	p := protoHeader{
+	p := ProtoHeader{
 		ProtoID:  protoID(buf[4]),
 		Major:    buf[5],
 		Minor:    buf[6],
@@ -80,7 +80,7 @@ func parseFrameBody(r *buffer) (frameBody, error) {
 
 	switch pType {
 	case typeCodeOpen:
-		t := new(performOpen)
+		t := new(PerformOpen)
 		err := t.unmarshal(r)
 		return t, err
 	case typeCodeBegin:

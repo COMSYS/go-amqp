@@ -155,6 +155,14 @@ func (c *Client) NewSession(opts ...SessionOption) (*Session, error) {
 	return s, nil
 }
 
+func (c *Client) GetStart() ProtoHeader {
+	return c.conn.header
+}
+
+func (c *Client) GetOpen() *PerformOpen {
+	return c.conn.open
+}
+
 // Default session options
 const (
 	DefaultMaxLinks = 4294967296

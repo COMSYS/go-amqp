@@ -195,7 +195,7 @@ type conn struct {
 	closeMuxOnce sync.Once
 
 	// connReader
-	rxProto       chan protoHeader // protoHeaders received by connReader
+	rxProto       chan ProtoHeader // protoHeaders received by connReader
 	rxFrame       chan frame       // AMQP frames received by connReader
 	rxDone        chan struct{}
 	connReaderRun chan func() // functions to be run by conn reader (set deadline on conn to run)
@@ -204,6 +204,8 @@ type conn struct {
 	txFrame chan frame // AMQP frames to be sent by connWriter
 	txBuf   buffer     // buffer for marshaling frames before transmitting
 	txDone  chan struct{}
+	open    *PerformOpen
+	header  ProtoHeader
 }
 
 type newSessionResp struct {
@@ -222,7 +224,7 @@ func newConn(netConn net.Conn, opts ...ConnOption) (*conn, error) {
 		done:             make(chan struct{}),
 		connErr:          make(chan error, 2), // buffered to ensure connReader/Writer won't leak
 		closeMux:         make(chan struct{}),
-		rxProto:          make(chan protoHeader),
+		rxProto:          make(chan ProtoHeader),
 		rxFrame:          make(chan frame),
 		rxDone:           make(chan struct{}),
 		connReaderRun:    make(chan func(), 1), // buffered to allow queueing function before interrupt
@@ -438,7 +440,12 @@ func (c *conn) mux() {
 // connReader reads from the net.Conn, decodes frames, and passes them
 // up via the conn.rxFrame and conn.rxProto channels.
 func (c *conn) connReader() {
-	defer close(c.rxDone)
+	defer func() {
+		close(c.rxDone)
+		if err := recover(); err != nil {
+			c.connErr <- errorErrorf("connReader panic: %v", err)
+		}
+	}()
 
 	buf := new(buffer)
 
@@ -721,6 +728,7 @@ func (c *conn) exchangeProtoHeader(pID protoID) stateFunc {
 		c.err = err
 		return nil
 	}
+	c.header = p
 
 	if pID != p.ProtoID {
 		c.err = errorErrorf("unexpected protocol header %#00x, expected %#00x", p.ProtoID, pID)
@@ -742,12 +750,12 @@ func (c *conn) exchangeProtoHeader(pID protoID) stateFunc {
 }
 
 // readProtoHeader reads a protocol header packet from c.rxProto.
-func (c *conn) readProtoHeader() (protoHeader, error) {
+func (c *conn) readProtoHeader() (ProtoHeader, error) {
 	var deadline <-chan time.Time
 	if c.connectTimeout != 0 {
 		deadline = time.After(c.connectTimeout)
 	}
-	var p protoHeader
+	var p ProtoHeader
 	select {
 	case p = <-c.rxProto:
 		return p, nil
@@ -800,7 +808,7 @@ func (c *conn) startTLS() stateFunc {
 // openAMQP round trips the AMQP open performative
 func (c *conn) openAMQP() stateFunc {
 	// send open frame
-	open := &performOpen{
+	open := &PerformOpen{
 		ContainerID:  c.containerID,
 		Hostname:     c.hostname,
 		MaxFrameSize: c.maxFrameSize,
@@ -824,12 +832,14 @@ func (c *conn) openAMQP() stateFunc {
 		c.err = err
 		return nil
 	}
-	o, ok := fr.body.(*performOpen)
+	o, ok := fr.body.(*PerformOpen)
 	if !ok {
 		c.err = errorErrorf("unexpected frame type %T", fr.body)
 		return nil
 	}
 	debug(1, "RX: %s", o)
+
+	c.open = o
 
 	// update peer settings
 	if o.MaxFrameSize > 0 {

@@ -257,7 +257,7 @@ var (
 	remoteChannel = uint16(4321)
 
 	protoTypes = []interface{}{
-		&performOpen{
+		&PerformOpen{
 			ContainerID:         "foo",
 			Hostname:            "bar.host",
 			MaxFrameSize:        4200,
